@@ -7,6 +7,7 @@ from constants import *
 #Modules externes
 import sqlite3
 import numpy as np
+from random import random
 from sklearn.datasets import make_blobs
 from scipy.spatial import distance
 
@@ -109,7 +110,7 @@ def GeneratePopulation():
     print("Attribution des quintiles sociales...")
     quintiles_prop = data_cur.execute("SELECT quintile, proportion FROM social").fetchall()
     for quintile in quintiles_prop:
-        pop_cur.execute("UPDATE population SET quintile = ? WHERE id_individu IN (SELECT id_individu FROM population WHERE quintile = NULL ORDER BY RANDOM() LIMIT ROUND ((SELECT COUNT(id_individu) FROM population) * ?))", (quintile[0], quintile[1]))
+        pop_cur.execute("UPDATE population SET quintile = ? WHERE id_individu IN (SELECT id_individu FROM population WHERE quintile IS NULL ORDER BY RANDOM() LIMIT ROUND ((SELECT COUNT(id_individu) FROM population) * ?))", (quintile[0], quintile[1]))
     pop_db.commit()
 
     print("Attribution des habitudes de vie...")
@@ -124,10 +125,18 @@ def GeneratePopulation():
         print("Attribution de la présence de maladies...")
         #MALADIES CHRONIQUES
         # On récupère chaque tranche d'âge avec la proportion de personnes qui ont une maladie chronique
-        for (age_min, age_max, proportion_age) in data_cur.execute("SELECT * FROM repartition_maladie").fetchall():
-            #On attribut aléatoirement la bonne proportion de maladie pour chaque âge
-            for (maladie, proportion_maladie) in data_cur.execute("SELECT nom, proportion FROM maladie").fetchall():
-                pop_cur.execute("UPDATE population SET '{}' = 1 WHERE id_individu IN (SELECT id_individu FROM population WHERE age >= ? AND age <= ? ORDER BY RANDOM() LIMIT ROUND ((SELECT COUNT(id_individu) FROM population WHERE age >= ? AND age <= ?) * ?))".format(maladie), (age_min, age_max, age_min, age_max, proportion_age*proportion_maladie))
+        moyenne_proportion_age = data_cur.execute("SELECT AVG(proportion) FROM repartition_maladie").fetchall()[0][0]
+        for (maladie, proportion_maladie) in data_cur.execute("SELECT nom, proportion FROM maladie").fetchall():
+            for (id_individu, age) in pop_cur.execute("SELECT id_individu,age FROM population").fetchall():
+                proportion_age = data_cur.execute("SELECT proportion FROM repartition_maladie WHERE min <= ? AND max >= ?", (age, age)).fetchall()[0][0]
+                if random() < proportion_maladie*proportion_age/moyenne_proportion_age:
+                    pop_cur.execute("UPDATE population SET '{}' = 1 WHERE id_individu = ?".format(maladie), (id_individu, ))
+
+
+        # for (age_min, age_max, proportion_age) in data_cur.execute("SELECT * FROM repartition_maladie").fetchall():
+        #     #On attribut aléatoirement la bonne proportion de maladie pour chaque âge
+        #     for (maladie, proportion_maladie) in data_cur.execute("SELECT nom, proportion FROM maladie").fetchall():
+        #         pop_cur.execute("UPDATE population SET '{}' = 1 WHERE id_individu IN (SELECT id_individu FROM population WHERE age >= ? AND age <= ? ORDER BY RANDOM() LIMIT ROUND ((SELECT COUNT(id_individu) FROM population WHERE age >= ? AND age <= ?) * ?))".format(maladie), (age_min, age_max, age_min, age_max, proportion_age*proportion_maladie))
         pop_db.commit()
     else:
         print("Réutilisation des données de maladies de la simulation précédente")

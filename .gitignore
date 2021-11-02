@@ -1,0 +1,4 @@
+
+*.pyc
+src/__pycache__/population.cpython-39.pyc
+data/population.db
