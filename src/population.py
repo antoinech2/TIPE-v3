@@ -16,7 +16,7 @@ REGENERATE_AGE = True
 REGENERATE_POSITION = True
 REGENERATE_MALADIE = True
 
-database_loc_data = "../data/population_data.db" #Chemin de la BDD qui contient les informations de génération de la population
+database_loc_data = "../res/population_data.db" #Chemin de la BDD qui contient les informations de génération de la population
 database_loc_pop = "../data/population.db" #Chemin de la BDD qui contient la liste des individus, et les états infectieux
 
 nb_population = 1000 #Nombre d'individus de la simulation
