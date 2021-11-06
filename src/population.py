@@ -43,8 +43,8 @@ def GeneratePopulation():
     #On créer les deux tables.
     # "population" contient la liste des individus, leur âge et présence de maladie chronique
     # "etat" contient l'état infectieux de la population, la durée restante de l'état, le rang vaccinal (nombre d'injections) et le type de vaccin
-    pop_cur.execute('CREATE TABLE "population" ("id_individu" INTEGER NOT NULL,"x_coord" REAL,"y_coord" REAL,"age" INTEGER,\
-    "genre" TEXT NOT NULL DEFAULT "femme","quintile" INTEGER,"tabac" INTEGER NOT NULL DEFAULT 0,"alcool" INTEGER NOT NULL DEFAULT 0,\
+    pop_cur.execute('CREATE TABLE IF NOT EXISTS "population" ("id_individu" INTEGER NOT NULL,"x_coord" REAL,"y_coord" REAL,"age" INTEGER,\
+    "genre" TEXT NOT NULL DEFAULT "femme", "activité" TEXT, "quintile" INTEGER,"tabac" INTEGER NOT NULL DEFAULT 0,"alcool" INTEGER NOT NULL DEFAULT 0,\
     "obésité" INTEGER NOT NULL DEFAULT 0,"diabète" INTEGER NOT NULL DEFAULT 0,"dyslipidémies" INTEGER NOT NULL DEFAULT 0,\
     "métabolique" INTEGER NOT NULL DEFAULT 0,"hypertension" INTEGER NOT NULL DEFAULT 0,"coronariennes" INTEGER NOT NULL DEFAULT 0,\
     "artériopathie" INTEGER NOT NULL DEFAULT 0,"trouble cardiaque" INTEGER NOT NULL DEFAULT 0,"insuffisance cardiaque" INTEGER NOT NULL DEFAULT 0,\
@@ -131,16 +131,23 @@ def GeneratePopulation():
                 proportion_age = data_cur.execute("SELECT proportion FROM repartition_maladie WHERE min <= ? AND max >= ?", (age, age)).fetchall()[0][0]
                 if random() < proportion_maladie*proportion_age/moyenne_proportion_age:
                     pop_cur.execute("UPDATE population SET '{}' = 1 WHERE id_individu = ?".format(maladie), (id_individu, ))
-
-
-        # for (age_min, age_max, proportion_age) in data_cur.execute("SELECT * FROM repartition_maladie").fetchall():
-        #     #On attribut aléatoirement la bonne proportion de maladie pour chaque âge
-        #     for (maladie, proportion_maladie) in data_cur.execute("SELECT nom, proportion FROM maladie").fetchall():
-        #         pop_cur.execute("UPDATE population SET '{}' = 1 WHERE id_individu IN (SELECT id_individu FROM population WHERE age >= ? AND age <= ? ORDER BY RANDOM() LIMIT ROUND ((SELECT COUNT(id_individu) FROM population WHERE age >= ? AND age <= ?) * ?))".format(maladie), (age_min, age_max, age_min, age_max, proportion_age*proportion_maladie))
         pop_db.commit()
     else:
         print("Réutilisation des données de maladies de la simulation précédente")
 
+    print("Attribution de l'emploi...")
+    pop_cur.execute("UPDATE population SET activité = 'études' WHERE age >= 3 AND age < 15")
+    for (age_min, age_max, genre, proportion_emploi) in data_cur.execute("SELECT * FROM repartition_emploi").fetchall():
+        for (secteur, proportion_genre, proportion_age) in data_cur.execute("SELECT emploi_genre.secteur, emploi_genre.proportion, emploi_age.proportion FROM emploi_age JOIN emploi_genre ON emploi_genre.secteur = emploi_age.secteur WHERE genre = ? AND min <= ? AND max >= ?", (genre, age_min, age_max)).fetchall():
+            pop_cur.execute("UPDATE population SET activité = ? WHERE id_individu IN (SELECT id_individu FROM population WHERE genre = ? AND age <= ? AND age >= ? AND activité IS NULL ORDER BY RANDOM() LIMIT ROUND ((SELECT COUNT(id_individu) FROM population WHERE genre = ? AND age <= ? AND age >= ?) * ?))", (secteur, genre, age_max, age_min,genre, age_max, age_min, proportion_emploi*proportion_age*proportion_genre))
+    pop_db.commit()
+
+    #for (id_individu, age, genre) in pop_cur.execute("SELECT id_individu,age,genre, FROM population").fetchall():
+        #proba_emploi = data_cur.execute("SELECT proportion FROM repartition_emploi WHERE genre = ? AND min <= ? AND max >= ?", (genre, age, age)).fetchall()[0][0]
+        #if random() < proba_emploi:
+
+        #elif 3 <= age <= 15:
+            #pop_cur.execute("UPDATE population SET activité = 'études' WHERE id_individu = ?", (id_individu, ))
 
     print("Population générée !")
 
@@ -179,7 +186,6 @@ def GetListDureeEtat():
 
 def GetAllVoisins(min_distance):
     """Retourne la liste des couples d'infecté/sain qui sont suceptibles d'intéragir (propagation possible)"""
-    #return np.array(pop_cur.execute("SELECT infectep.id_individu, sainp.id_individu FROM population AS infectep JOIN etat AS infectee ON infectep.id_individu = infectee.id_individu, population AS sainp JOIN etat AS saine ON sainp.id_individu = saine.id_individu WHERE saine.etat = ? AND infectee.etat = ? AND (SELECT distance FROM distance WHERE id_1 = sainp.id_individu AND id_2 = infectee.id_individu) <= ?", (NEUTRE, INFECTE, min_distance)).fetchall())
     return np.array(pop_cur.execute("SELECT id_1, id_2 FROM distance JOIN etat AS etat_1 ON etat_1.id_individu = id_1 JOIN etat AS etat_2 ON etat_2.id_individu = id_2 WHERE etat_1.etat = ? AND etat_2.etat = ? AND distance <= ?", (NEUTRE, INFECTE, min_distance)).fetchall())
 
 def GetPosition(id_individu):
