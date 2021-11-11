@@ -20,8 +20,7 @@ REGENERATE_MALADIE = True
 database_loc_data = "../res/population_data.db" #Chemin de la BDD qui contient les informations de génération de la population
 database_loc_pop = "../data/population.db" #Chemin de la BDD qui contient la liste des individus, et les états infectieux
 
-nb_population = 1000 #Nombre d'individus de la simulation
-variance_pop = 1  # recommandé : 1
+variance_pop = 1
 
 #Initialisation des BDD et des curseurs
 data_db = sqlite3.connect(database_loc_data)
@@ -126,8 +125,16 @@ def GeneratePopulation():
         #MALADIES CHRONIQUES
         # On récupère chaque tranche d'âge avec la proportion de personnes qui ont une maladie chronique
         moyenne_proportion_age = data_cur.execute("SELECT AVG(proportion) FROM repartition_maladie").fetchall()[0][0]
+        nb_maladie = data_cur.execute("SELECT COUNT(nom) FROM maladie").fetchall()[0][0]
+        avancement = 0
         for (maladie, proportion_maladie) in data_cur.execute("SELECT nom, proportion FROM maladie").fetchall():
+            avancement += 1
+            print("\x1b[2K\r   Attribution de la maladie {}/{} ({}%) ('{}')".format(avancement, nb_maladie, avancement/nb_maladie*100, maladie))
+            avancement_pop = 0
             for (id_individu, age) in pop_cur.execute("SELECT id_individu,age FROM population").fetchall():
+                avancement_pop += 1
+                if avancement_pop % 5000 == 0:
+                    print("\x1b[2K\r      Attribution de la maladie {}/{} ({}%)".format(avancement_pop, nb_population, avancement_pop/nb_population*100), end="")
                 proportion_age = data_cur.execute("SELECT proportion FROM repartition_maladie WHERE min <= ? AND max >= ?", (age, age)).fetchall()[0][0]
                 if random() < proportion_maladie*proportion_age/moyenne_proportion_age:
                     pop_cur.execute("UPDATE population SET '{}' = 1 WHERE id_individu = ?".format(maladie), (id_individu, ))
