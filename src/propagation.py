@@ -18,17 +18,7 @@ from constants import *
 def distance_e(x, y):  # distance entre 2 points du plan cartésien
     return distance.euclidean([x[0],x[1]],[y[0],y[1]])
 
-max_jour = 1000
-
-#Variables de simulation [TEMPORAIRE]
-variance_pop = 1  # recommandé : 1
-rayon_contamination = 0.5  # recommandé : 0.5
-infectiosite = 0.01  # recommandé : 10%
-p = 0.15  # recommandé : 10% : IMMUNITE
-d = 0.02  # recommandé : 5% : MORT
-
-#Fonctions temporaires pour déterminer la propagation du virus
-#A modifier pour prendre en compte les caractéristiques de chaque individu
+max_jour = 100
 
 def ChanceInfection(individu):  # return True si il devient infecté avec une proba p
     return rd.random() <= infectiosite
@@ -44,18 +34,6 @@ def StartSimulation():
     print('Début de la simulation ... \n')
     start = time.time()
 
-    # NOTE : si les courbes restent constantes, augmentez le rayon de contamination
-    # si le virus est trés mortel il n'y aura pas beaucoup de propagation
-
-    if nb_population < 10 or rayon_contamination <= 0:
-        return 'error, nb_population and var_population and rayon_contamination must be >=10 and > 0'
-    if infectiosite < 0 or infectiosite > 1:
-        return 'error, infectiosité must be in [0,1]'
-    if p < 0 or p > 1:
-        return 'error, p must be in [0,1]'
-    if d < 0 or p > 1:
-        return 'error, d must be in [0,1]'
-
     # création des figures
     fig = make_subplots(rows=2, cols=2, column_widths=[0.8, 0.2], row_heights=[0.5, 0.5],
                         subplot_titles=["population", "", ""],
@@ -65,18 +43,25 @@ def StartSimulation():
     # création des courbes finales et listes des coordonnées
     data = dict(courbe_neutres = [],courbe_infectes = [],courbe_immunises = [],courbe_deces = [],courbe_sains = [])
 
-    id_patient_0 = rd.randint(0, nb_population - 1)  # on choisit le premier individu infecté au hasard
-    #On infecte le patient 0
-    Infect(id_patient_0)
+    # id_patient_0 = rd.randint(0, nb_population - 1)  # on choisit le premier individu infecté au hasard
+    # #On infecte le patient 0
+    # Infect(id_patient_0)
+    #
+    # # Remplissage des listes initialement
+    # data['courbe_neutres'].append(nb_population-1)
+    # data['courbe_infectes'].append(1)
+    # data['courbe_immunises'].append(0)
+    # data['courbe_deces'].append(0)
+    # data['courbe_sains'].append(nb_population-1)
 
-    # Remplissage des listes initialement
-    data['courbe_neutres'].append(nb_population-1)
-    data['courbe_infectes'].append(1)
-    data['courbe_immunises'].append(0)
-    data['courbe_deces'].append(0)
-    data['courbe_sains'].append(nb_population-1)
+    # Situation initiale : jour 0
 
-    jour = 2
+    pop_cur.execute("UPDATE etat SET etat_infection = ? AND duree_etat_infection = ? WHERE id_individu IN (SELECT id_individu FROM etat ORDER BY RANDOM() LIMIT ?)", (INFECTE, random.randint(DUREE[INFECTE][0], DUREE[INFECTE][0])))
+    pop_cur.execute("UPDATE etat SET etat_sante = ? AND duree_etat_infection = ? WHERE id_individu IN (SELECT id_individu FROM etat WHERE etat_infection = ? ORDER BY RANDOM() LIMIT ?)", (HOSPITALISE, INFECTE, random.randint(DUREE[HOSPITALISE][0], DUREE[HOSPITALISE][0])))
+    pop_cur.execute("UPDATE etat SET etat_sante = ? AND duree_etat_infection = ? WHERE id_individu IN (SELECT id_individu FROM etat WHERE etat_sante = ? ORDER BY RANDOM() LIMIT ?)", (REANIMATION, HOSPITALISE, random.randint(DUREE[REANIMATION][0], DUREE[REANIMATION][0])))
+    pop_cur.commit()
+
+    jour = 1
     # Jours 2 à n
 
     #On boucle sur chaque jour de simulation jusqu'à une condition d'arrêt (plus d'infection ou plus de neutre)
@@ -85,13 +70,35 @@ def StartSimulation():
 
         #Traitement des individus ayant un état à durée limitée
         #On régupère tous les individus concernés
-        for id_individu, etat, duree_etat in GetListDureeEtat():
+
+        #Etat de santé
+        for id_individu, etat, duree_etat in GetListDureeEtat(SANTE):
+            if duree_etat != 0:
+                ReduceDureeEtat(id_individu, SANTE)
+            else:
+                if etat == NEUTRE:
+                    raise Error("Une durée d'état de santé neutre est arrivé à 0")
+                elif etat == HOSPITALISE:
+                    if ChanceReanimation(id_individu):
+                        ChangeEtatSante(id_individu, REANIMATION)
+                    else:
+                        ChangeEtatSante(id_individu, NEUTRE)
+                elif etat == REANIMATION:
+                    if ChanceDeces(id_individu):
+                        ChangeEtatSante(id_individu, DECEDE)
+                    else:
+                        ChangeEtatSante(id_individu, HOSPITALISE)
+
+
+        for id_individu, etat, duree_etat in GetListDureeEtat(INFECTION):
             if duree_etat != 0:
                 #Si la durée restante est non nulle, on la diminue d'un jour
-                ReduceDureeEtat(id_individu)
+                ReduceDureeEtat(id_individu, INFECTION)
             else:
                 #Lorsque l'on atteint la fin de l'état
-                if etat == INFECTE:
+                if etat == NEUTRE:
+                    raise Error("Une durée d'état d'infection neutre est arrivé à 0")
+                elif etat == INFECTE:
                     #A la fin d'une infection, on détermine avec les fonctions de probas si l'individus guérit, meurt ou redevient neutre
                     if ChanceMort(id_individu):
                         Mort(id_individu)

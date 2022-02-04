@@ -51,7 +51,15 @@ def GeneratePopulation():
     "mucoviscidose" INTEGER NOT NULL DEFAULT 0,"embolie" INTEGER NOT NULL DEFAULT 0,"cancer" INTEGER NOT NULL DEFAULT 0,\
     "inflammatoire" INTEGER NOT NULL DEFAULT 0,"antidépresseur" INTEGER NOT NULL DEFAULT 0,"neuroleptique" INTEGER NOT NULL DEFAULT 0,\
     "parkinson" INTEGER NOT NULL DEFAULT 0,"démence" INTEGER NOT NULL DEFAULT 0,PRIMARY KEY("id_individu" AUTOINCREMENT))')
-    pop_cur.execute('CREATE TABLE IF NOT EXISTS "etat" ("id_individu" INTEGER NOT NULL, "etat" INTEGER NOT NULL DEFAULT {} , "duree_etat" INTEGER DEFAULT NULL, "phase_vaccin" INTEGER NOT NULL DEFAULT 0, "id_vaccin" INTEGER DEFAULT NULL, PRIMARY KEY("id_individu" AUTOINCREMENT))'.format(NEUTRE))
+    pop_cur.execute('CREATE TABLE IF NOT EXISTS "etat" (\
+	"id_individu"	INTEGER NOT NULL,\
+	"etat_infection"	INTEGER NOT NULL DEFAULT 0,\
+	"duree_etat_infection"	INTEGER,\
+	"etat_sante"	INTEGER NOT NULL DEFAULT 0,\
+	"duree_etat_sante"	INTEGER,\
+	"rang_vaccin"	INTEGER NOT NULL DEFAULT 0,\
+	"immunite"	REAL NOT NULL DEFAULT 0,\
+	PRIMARY KEY("id_individu" AUTOINCREMENT));')
     pop_cur.execute('CREATE TABLE IF NOT EXISTS "distance" ("id_1" INTEGER NOT NULL, "id_2" INTEGER NOT NULL, "distance" REAL NOT NULL, PRIMARY KEY("id_1", "id_2"))')
     pop_db.commit()
 
@@ -187,9 +195,12 @@ def GetEtatInfection(id_individu):
     """Renvoie l'état d'un individu en spécifiant son id"""
     return pop_cur.execute("SELECT etat FROM etat WHERE id_individu = ?", (int(id_individu),)).fetchall()[0][0]
 
-def GetListDureeEtat():
+def GetListDureeEtat(type):
     """Renvoie la liste des individus qui ont un état à durée définie, leur état et la durée restante associée"""
-    return np.array(pop_cur.execute("SELECT id_individu, etat, duree_etat FROM etat WHERE duree_etat NOT NULL").fetchall())
+    if type == INFECTION:
+        return np.array(pop_cur.execute("SELECT id_individu, etat_infection, duree_etat_infection FROM etat WHERE etat_infection != ? AND duree_etat_infection NOT NULL", (MORT, )).fetchall())
+    else:
+        return np.array(pop_cur.execute("SELECT id_individu, etat_sante, duree_etat_sante FROM etat WHERE duree_etat_sante NOT NULL AND etat_infection != ?", (MORT, )).fetchall())
 
 def GetAllVoisins(min_distance):
     """Retourne la liste des couples d'infecté/sain qui sont suceptibles d'intéragir (propagation possible)"""
@@ -206,17 +217,21 @@ def Infect(id_individu):
     ChangeEtat(id_individu, INFECTE)
     pop_cur.execute("UPDATE etat SET duree_etat = ? WHERE id_individu = ?", (DUREE[INFECTE], int(id_individu)))
 
-def ReduceDureeEtat(id_individu):
+def ReduceDureeEtat(id_individu, type):
     """Réduit d'un jour la durée restante de l'état d'un individu"""
-    pop_cur.execute("UPDATE etat SET duree_etat = duree_etat - 1 WHERE id_individu = ?", (int(id_individu), ))
+    if type == INFEFCTION:
+        pop_cur.execute("UPDATE etat SET duree_etat_infection = duree_etat_infection - 1 WHERE id_individu = ?", (int(id_individu), ))
+    else:
+        pop_cur.execute("UPDATE etat SET duree_etat_sante = duree_etat_sante - 1 WHERE id_individu = ?", (int(id_individu), ))
 
-def ChangeEtat(id_individu, new_etat):
+
+def ChangeEtatSante(id_individu, new_etat):
     """Change l'état d'un individu"""
-    pop_cur.execute("UPDATE etat SET etat = ?, duree_etat = NULL WHERE id_individu = ?", (new_etat, int(id_individu)))
+    pop_cur.execute("UPDATE etat SET etat_sante = ?, duree_etat_sante = NULL WHERE id_individu = ?", (new_etat, int(id_individu)))
 
-def Mort(id_individu):
-    """Tue l'individu"""
-    ChangeEtat(id_individu, MORT)
+def ChangeEtatInfection(id_individu, new_etat):
+    """Change l'état d'un individu"""
+    pop_cur.execute("UPDATE etat SET etat_infection = ?, duree_etat_infection = NULL WHERE id_individu = ?", (new_etat, int(id_individu)))
 
 def Immunite(id_individu):
     """Rend l'individu immunisé"""
