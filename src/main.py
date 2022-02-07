@@ -1,5 +1,5 @@
 from population import GeneratePopulation, CloseDB
-from propagation import StartSimulation
+#from propagation import StartSimulation
 
 #Programme principal
 

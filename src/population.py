@@ -14,13 +14,11 @@ from scipy.spatial import distance
 DESTROY_TABLE = True #Mettre à True pour regénérer une nouvelle population à chaque nouvelle exécution
 CLEAN_TABLE = False
 REGENERATE_AGE = True
-REGENERATE_POSITION = False
+REGENERATE_POSITION = True
 REGENERATE_MALADIE = True
 
 database_loc_data = "../res/population_data.db" #Chemin de la BDD qui contient les informations de génération de la population
 database_loc_pop = "../data/population.db" #Chemin de la BDD qui contient la liste des individus, et les états infectieux
-
-variance_pop = 1
 
 #Initialisation des BDD et des curseurs
 data_db = sqlite3.connect(database_loc_data)
@@ -28,7 +26,7 @@ pop_db = sqlite3.connect(database_loc_pop)
 data_cur = data_db.cursor()
 pop_cur = pop_db.cursor()
 
-def GeneratePopulation():
+def GeneratePopulation(nb_population, variance_pop):
     """Génère la population en complétant la BDD"""
     print("Génération de la population...")
     if DESTROY_TABLE: #On supprime les anciennes tables pour tout regénérer
@@ -43,7 +41,7 @@ def GeneratePopulation():
     # "population" contient la liste des individus, leur âge et présence de maladie chronique
     # "etat" contient l'état infectieux de la population, la durée restante de l'état, le rang vaccinal (nombre d'injections) et le type de vaccin
     pop_cur.execute('CREATE TABLE IF NOT EXISTS "population" ("id_individu" INTEGER NOT NULL,"x_coord" REAL,"y_coord" REAL,"age" INTEGER,\
-    "genre" TEXT NOT NULL DEFAULT "femme", "activité" TEXT, "quintile" INTEGER,"tabac" INTEGER NOT NULL DEFAULT 0,"alcool" INTEGER NOT NULL DEFAULT 0,\
+    "sexe" TEXT NOT NULL DEFAULT "femme", "activité" TEXT, "quintile" INTEGER,"tabac" INTEGER NOT NULL DEFAULT 0,"alcool" INTEGER NOT NULL DEFAULT 0,\
     "obésité" INTEGER NOT NULL DEFAULT 0,"diabète" INTEGER NOT NULL DEFAULT 0,"dyslipidémies" INTEGER NOT NULL DEFAULT 0,\
     "métabolique" INTEGER NOT NULL DEFAULT 0,"hypertension" INTEGER NOT NULL DEFAULT 0,"coronariennes" INTEGER NOT NULL DEFAULT 0,\
     "artériopathie" INTEGER NOT NULL DEFAULT 0,"trouble cardiaque" INTEGER NOT NULL DEFAULT 0,"insuffisance cardiaque" INTEGER NOT NULL DEFAULT 0,\
@@ -109,9 +107,9 @@ def GeneratePopulation():
     else:
         print("Réutilisation des données de position de la simulation précédente")
 
-    print("Attribution du genre...")
-    proportion_homme = data_cur.execute("SELECT proportion FROM genre WHERE genre = 'homme'").fetchall()[0][0]
-    pop_cur.execute("UPDATE population SET genre = 'homme' WHERE id_individu IN (SELECT id_individu FROM population ORDER BY RANDOM() LIMIT ROUND ((SELECT COUNT(id_individu) FROM population) * ?))", (proportion_homme, ))
+    print("Attribution du sexe...")
+    proportion_homme = data_cur.execute("SELECT proportion FROM repartition_sexe WHERE sexe = 'homme'").fetchall()[0][0]
+    pop_cur.execute("UPDATE population SET sexe = 'homme' WHERE id_individu IN (SELECT id_individu FROM population ORDER BY RANDOM() LIMIT ROUND ((SELECT COUNT(id_individu) FROM population) * ?))", (proportion_homme, ))
     pop_db.commit()
 
     print("Attribution des quintiles sociales...")
@@ -152,17 +150,10 @@ def GeneratePopulation():
 
     print("Attribution de l'emploi...")
     pop_cur.execute("UPDATE population SET activité = 'études' WHERE age >= 3 AND age < 15")
-    for (age_min, age_max, genre, proportion_emploi) in data_cur.execute("SELECT * FROM repartition_emploi").fetchall():
-        for (secteur, proportion_genre, proportion_age) in data_cur.execute("SELECT emploi_genre.secteur, emploi_genre.proportion, emploi_age.proportion FROM emploi_age JOIN emploi_genre ON emploi_genre.secteur = emploi_age.secteur WHERE genre = ? AND min <= ? AND max >= ?", (genre, age_min, age_max)).fetchall():
-            pop_cur.execute("UPDATE population SET activité = ? WHERE id_individu IN (SELECT id_individu FROM population WHERE genre = ? AND age <= ? AND age >= ? AND activité IS NULL ORDER BY RANDOM() LIMIT ROUND ((SELECT COUNT(id_individu) FROM population WHERE genre = ? AND age <= ? AND age >= ?) * ?))", (secteur, genre, age_max, age_min,genre, age_max, age_min, proportion_emploi*proportion_age*proportion_genre))
+    for (age_min, age_max, sexe, proportion_emploi) in data_cur.execute("SELECT * FROM repartition_emploi").fetchall():
+        for (secteur, proportion_sexe, proportion_age) in data_cur.execute("SELECT emploi_sexe.secteur, emploi_sexe.proportion, emploi_age.proportion FROM emploi_age JOIN emploi_sexe ON emploi_sexe.secteur = emploi_age.secteur WHERE sexe = ? AND min <= ? AND max >= ?", (sexe, age_min, age_max)).fetchall():
+            pop_cur.execute("UPDATE population SET activité = ? WHERE id_individu IN (SELECT id_individu FROM population WHERE sexe = ? AND age <= ? AND age >= ? AND activité IS NULL ORDER BY RANDOM() LIMIT ROUND ((SELECT COUNT(id_individu) FROM population WHERE sexe = ? AND age <= ? AND age >= ?) * ?))", (secteur, sexe, age_max, age_min,sexe, age_max, age_min, proportion_emploi*proportion_age*proportion_sexe))
     pop_db.commit()
-
-    #for (id_individu, age, genre) in pop_cur.execute("SELECT id_individu,age,genre, FROM population").fetchall():
-        #proba_emploi = data_cur.execute("SELECT proportion FROM repartition_emploi WHERE genre = ? AND min <= ? AND max >= ?", (genre, age, age)).fetchall()[0][0]
-        #if random() < proba_emploi:
-
-        #elif 3 <= age <= 15:
-            #pop_cur.execute("UPDATE population SET activité = 'études' WHERE id_individu = ?", (id_individu, ))
 
     print("Population générée !")
 
@@ -172,6 +163,46 @@ def CloseDB():
     pop_db.close()
     data_cur.close()
     data_db.close()
+
+
+class Individu:
+    def __init__(self, age, position, sexe, activite, multiplicateur, liste_voisins):
+        self.age = age
+        self.position = position
+        self.sexe = sexe
+        self.activite = activite
+        self.multiplicateur = multiplicateur
+        print(liste_voisins)
+
+maladie_liste = ["obésité", "diabète", "dyslipidémies", "métabolique", "hypertension", "coronariennes", "artériopathie", "trouble cardiaque", "insuffisance cardiaque", "valvulopathies", "avc", "respiratoire", "mucoviscidose", "embolie", "cancer", "inflammatoire", "antidépresseur", "neuroleptique", "parkinson", "démence"]
+
+class Population:
+    def __init__(self, nb_individus, variance_pop, min_distance):
+        GeneratePopulation(nb_individus, variance_pop)
+        pop_db.row_factory = sqlite3.Row
+        pop_cur = pop_db.cursor()
+        self.individus = []
+        for id in range(1, nb_individus+1):
+            data = dict(pop_cur.execute("SELECT * from population WHERE id_individu = ?", (id, )).fetchall()[0])
+            voisins = np.array(pop_cur.execute("SELECT id_2 from distance WHERE id_1 = ? AND distance > 0.0 AND distance <= ?", (id, min_distance)).fetchall())
+            if len(voisins) != 0:
+                voisins = voisins[:,0]
+            self.individus.append(Individu(data["age"], (data["x_coord"], data["y_coord"]), data["sexe"], data["activité"], self.calcul_risque_multiplicateur(data), voisins))
+
+    def calcul_risque_multiplicateur(self, data):
+        multiplicateur = np.array(data_cur.execute("SELECT probar_hopital, probar_deces from age WHERE min <= ? AND max >= ?", (data["age"], data["age"])).fetchall()[0])
+        multiplicateur *= np.array(data_cur.execute("SELECT probar_hopital, probar_deces from social WHERE quintile = ?", (data["quintile"],)).fetchall()[0])
+        if data["tabac"]:
+            multiplicateur *= np.array(data_cur.execute("SELECT probar_hopital, probar_deces from habitudes WHERE carac = 'tabac'").fetchall()[0])
+        if data["alcool"]:
+            multiplicateur *= np.array(data_cur.execute("SELECT probar_hopital, probar_deces from habitudes WHERE carac = 'alcool'").fetchall()[0])
+        for maladie in maladie_liste:
+            if data[maladie]:
+                multiplicateur *= np.array(data_cur.execute("SELECT probar_hopital, probar_deces from maladie WHERE nom = ?", (maladie, )).fetchall()[0])
+        return multiplicateur[0], multiplicateur[1]
+
+test = Population(100, 2, 1)
+
 
 #Getters
 
