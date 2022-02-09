@@ -1,15 +1,16 @@
 #Fichier pour générer la population
 #Objectif : recréer une population représentative de la France par rapport à différents critères.
 
-#Modules internes
-from constantes import *
-
 #Modules externes
 import sqlite3
-import numpy as np
 from random import random
-from sklearn.datasets import make_blobs
+
+import numpy as np
 from scipy.spatial import distance
+from sklearn.datasets import make_blobs
+
+#Modules internes
+from constantes import *
 
 DESTROY_TABLE = True #Mettre à True pour regénérer une nouvelle population à chaque nouvelle exécution
 CLEAN_TABLE = False
@@ -216,6 +217,7 @@ class Individu:
         self.sante_duree = duree
 
     def hospitaliser(self, duree):
+        self.sante = INFECTE
         self.infection = HOSPITALISE
         self.sante_duree = None
         self.infection_duree = duree
@@ -226,6 +228,11 @@ class Individu:
         self.infection = NEUTRE
         self.infection_duree = None
         self.infection_immunite_date = jour
+
+    def deces(self):
+        self.sante = DECEDE
+        self.sante_duree = None
+        self.infection_duree = None
 
     def get_immunite(self, jour, type):
         if type == INFECTION:
@@ -241,71 +248,3 @@ class Individu:
             mois_vaccin = (jour - self.infection_immunite_date)/30.5
             multiplicateur *= data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = 'Infection' AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max => ? AND etat = ?", (self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0]
         return multiplicateur
-#Getters
-
-def GetAllEtat():
-    """Renvoie tous les individus et leur état"""
-    return pop_cur.execute("SELECT id_individu, etat FROM etat").fetchall()
-
-def GetNombreEtatInfection(etat):
-    """Renvoie le nombre d'invidus qui ont l'état précisé"""
-    if type(etat) != list:
-        etat = [etat]
-    return pop_cur.execute("SELECT COUNT(id_individu) FROM etat WHERE etat IN ({})".format(str(etat)[1:len(str(etat))-1])).fetchall()[0][0]
-
-def GetListEtatInfection(etat):
-    """Revoie la liste des id d'individus qui ont l'état précisé"""
-    if type(etat) != list:
-        etat = [etat]
-    return np.array(pop_cur.execute("SELECT id_individu FROM etat WHERE etat IN ({})".format(str(etat)[1:len(str(etat))-1])).fetchall())[:, 0]
-
-def GetEtatInfection(id_individu):
-    """Renvoie l'état d'un individu en spécifiant son id"""
-    return pop_cur.execute("SELECT etat FROM etat WHERE id_individu = ?", (int(id_individu),)).fetchall()[0][0]
-
-def GetListDureeEtat(type):
-    """Renvoie la liste des individus qui ont un état à durée définie, leur état et la durée restante associée"""
-    if type == INFECTION:
-        return np.array(pop_cur.execute("SELECT id_individu, etat_infection, duree_etat_infection FROM etat WHERE etat_infection != ? AND duree_etat_infection NOT NULL", (MORT, )).fetchall())
-    else:
-        return np.array(pop_cur.execute("SELECT id_individu, etat_sante, duree_etat_sante FROM etat WHERE duree_etat_sante NOT NULL AND etat_infection != ?", (MORT, )).fetchall())
-
-def GetAllVoisins(min_distance):
-    """Retourne la liste des couples d'infecté/sain qui sont suceptibles d'intéragir (propagation possible)"""
-    return np.array(pop_cur.execute("SELECT id_1, id_2 FROM distance JOIN etat AS etat_1 ON etat_1.id_individu = id_1 JOIN etat AS etat_2 ON etat_2.id_individu = id_2 WHERE etat_1.etat = ? AND etat_2.etat = ? AND distance <= ?", (NEUTRE, INFECTE, min_distance)).fetchall())
-
-def GetPosition(id_individu):
-    """Retourne les coordonnées de l'individu"""
-    return np.array(pop_cur.execute("SELECT x_coord, y_coord FROM population WHERE id_individu = ?", (id_individu,)).fetchall())[0]
-
-#Setter
-
-def Infect(id_individu):
-    """Infecte un individu et défini son temps d'infection"""
-    ChangeEtat(id_individu, INFECTE)
-    pop_cur.execute("UPDATE etat SET duree_etat = ? WHERE id_individu = ?", (DUREE[INFECTE], int(id_individu)))
-
-def ReduceDureeEtat(id_individu, type):
-    """Réduit d'un jour la durée restante de l'état d'un individu"""
-    if type == INFEFCTION:
-        pop_cur.execute("UPDATE etat SET duree_etat_infection = duree_etat_infection - 1 WHERE id_individu = ?", (int(id_individu), ))
-    else:
-        pop_cur.execute("UPDATE etat SET duree_etat_sante = duree_etat_sante - 1 WHERE id_individu = ?", (int(id_individu), ))
-
-
-def ChangeEtatSante(id_individu, new_etat):
-    """Change l'état d'un individu"""
-    pop_cur.execute("UPDATE etat SET etat_sante = ?, duree_etat_sante = NULL WHERE id_individu = ?", (new_etat, int(id_individu)))
-
-def ChangeEtatInfection(id_individu, new_etat):
-    """Change l'état d'un individu"""
-    pop_cur.execute("UPDATE etat SET etat_infection = ?, duree_etat_infection = NULL WHERE id_individu = ?", (new_etat, int(id_individu)))
-
-def Immunite(id_individu):
-    """Rend l'individu immunisé"""
-    ChangeEtat(id_individu, IMMUNISE)
-    pop_cur.execute("UPDATE etat SET duree_etat = ? WHERE id_individu = ?", (DUREE[IMMUNISE], int(id_individu)))
-
-def Neutre(id_individu):
-    """Rend l'individu neutre, c'est à dire vulnérable mais non infecté"""
-    ChangeEtat(id_individu, NEUTRE)
