@@ -12,8 +12,9 @@ nb_population = 1000
 #Constantes des identifiants des différents status de l'infection d'une personne
 
 #Types d'états
-SANTE = 1
-INFECTION = 0
+INFECTION = 1
+HOSPITALISATION = 2
+DECES = 3
 
 #Etat santé
 DECEDE = -1
@@ -24,7 +25,6 @@ INFECTE = 1
 NEUTRE = 0
 ISOLE = 1
 HOSPITALISE = 2
-REANIMATION = 3
 
 #Situation initiale :
 SITUATION_INITIALE = {

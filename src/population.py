@@ -2,7 +2,7 @@
 #Objectif : recréer une population représentative de la France par rapport à différents critères.
 
 #Modules internes
-from constants import *
+from constantes import *
 
 #Modules externes
 import sqlite3
@@ -190,7 +190,6 @@ def CloseDB():
     data_cur.close()
     data_db.close()
 
-
 class Individu:
     def __init__(self, age, position, sexe, activite, multiplicateur, liste_voisins):
         # Caractéristiques
@@ -204,9 +203,44 @@ class Individu:
         # Etat de santé
         self.sante = NEUTRE
         self.infection = NEUTRE
+        self.sante_duree = None
+        self.infection_duree = None
+
         self.vaccin_type = None
         self.vaccin_date = None
 
+        self.infection_immunite_date = None
+
+    def infecter(self, duree):
+        self.sante = INFECTE
+        self.sante_duree = duree
+
+    def hospitaliser(self, duree):
+        self.infection = HOSPITALISE
+        self.sante_duree = None
+        self.infection_duree = duree
+
+    def guerir(self, jour):
+        self.sante = NEUTRE
+        self.sante_duree = None
+        self.infection = NEUTRE
+        self.infection_duree = None
+        self.infection_immunite_date = jour
+
+    def get_immunite(self, jour, type):
+        if type == INFECTION:
+            multiplicateur = 1
+        elif type == HOSPITALISATION:
+            multiplicateur = self.multiplicateur[0]
+        elif type == DECES:
+            multiplicateur = self.multiplicateur[1]
+        if self.vaccin_type is not None:
+            mois_vaccin = (jour - self.vaccin_date)/30.5
+            multiplicateur *= data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max => ? AND etat = ?", (self.vaccin_type, self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0]
+        if self.infection_immunite_date is not None:
+            mois_vaccin = (jour - self.infection_immunite_date)/30.5
+            multiplicateur *= data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = 'Infection' AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max => ? AND etat = ?", (self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0]
+        return multiplicateur
 #Getters
 
 def GetAllEtat():
