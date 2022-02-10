@@ -13,7 +13,7 @@ from sklearn.datasets import make_blobs
 from constantes import *
 
 DESTROY_TABLE = True #Mettre à True pour regénérer une nouvelle population à chaque nouvelle exécution
-CLEAN_TABLE = False
+CLEAN_TABLE = True
 REGENERATE_AGE = True
 REGENERATE_POSITION = True
 REGENERATE_MALADIE = True
@@ -30,17 +30,17 @@ pop_cur = pop_db.cursor()
 maladie_liste = ["obésité", "diabète", "dyslipidémies", "métabolique", "hypertension", "coronariennes", "artériopathie", "trouble cardiaque", "insuffisance cardiaque", "valvulopathies", "avc", "respiratoire", "mucoviscidose", "embolie", "cancer", "inflammatoire", "antidépresseur", "neuroleptique", "parkinson", "démence"]
 
 class Population:
-    def __init__(self, nb_individus, variance_pop, min_distance):
-        self.GeneratePopulation(nb_individus, variance_pop)
+    def __init__(self, nb_individus, variance_pop, max_distance):
+        self.generer_population(nb_individus, variance_pop)
         pop_db.row_factory = sqlite3.Row
         pop_cur = pop_db.cursor()
         self.individus = []
         for id in range(1, nb_individus+1):
             data = dict(pop_cur.execute("SELECT * from population WHERE id_individu = ?", (id, )).fetchall()[0])
-            voisins = np.array(pop_cur.execute("SELECT id_2 from distance WHERE id_1 = ? AND distance > 0.0 AND distance <= ?", (id, min_distance)).fetchall())
+            voisins = np.array(pop_cur.execute("SELECT id_2 from distance WHERE id_1 = ? AND distance > 0.0 AND distance <= ?", (id, max_distance)).fetchall())
             if len(voisins) != 0:
                 voisins = voisins[:,0]
-            self.individus.append(Individu(data["age"], (data["x_coord"], data["y_coord"]), data["sexe"], data["activité"], self.calcul_risque_multiplicateur(data), voisins))
+            self.individus.append(Individu(data["id_individu"], data["age"], (data["x_coord"], data["y_coord"]), data["sexe"], data["activité"], self.calcul_risque_multiplicateur(data), voisins))
 
     def calcul_risque_multiplicateur(self, data):
         multiplicateur = np.array(data_cur.execute("SELECT probar_hopital, probar_deces from age WHERE min <= ? AND max >= ?", (data["age"], data["age"])).fetchall()[0])
@@ -54,7 +54,7 @@ class Population:
                 multiplicateur *= np.array(data_cur.execute("SELECT probar_hopital, probar_deces from maladie WHERE nom = ?", (maladie, )).fetchall()[0])
         return multiplicateur[0], multiplicateur[1]
 
-    def GeneratePopulation(self, nb_population, variance_pop):
+    def generer_population(self, nb_population, variance_pop):
         """Génère la population en complétant la BDD"""
         print("Génération de la population...")
         if DESTROY_TABLE: #On supprime les anciennes tables pour tout regénérer
@@ -184,7 +184,13 @@ class Population:
 
         print("\033[92mPopulation générée !\033[0m")
 
-def CloseDB():
+    def get_distance(self, individu_1, individu_2):
+        return pop_cur.execute("SELECT distance from distance WHERE id_1 = ? AND id_2 = ?", (individu_1.id, individu_2.id)).fetchall()[0][0]
+
+    def get_individu(self, id):
+        return self.individus[id-1]
+
+def close_database():
     """Ferme les curseur et les BDD"""
     pop_cur.close()
     pop_db.close()
@@ -192,8 +198,9 @@ def CloseDB():
     data_db.close()
 
 class Individu:
-    def __init__(self, age, position, sexe, activite, multiplicateur, liste_voisins):
+    def __init__(self, id, age, position, sexe, activite, multiplicateur, liste_voisins):
         # Caractéristiques
+        self.id = id
         self.age = age
         self.position = position
         self.sexe = sexe
@@ -243,8 +250,8 @@ class Individu:
             multiplicateur = self.multiplicateur[1]
         if self.vaccin_type is not None:
             mois_vaccin = (jour - self.vaccin_date)/30.5
-            multiplicateur *= data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max => ? AND etat = ?", (self.vaccin_type, self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0]
+            multiplicateur *= data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?", (self.vaccin_type, self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0]
         if self.infection_immunite_date is not None:
             mois_vaccin = (jour - self.infection_immunite_date)/30.5
-            multiplicateur *= data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = 'Infection' AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max => ? AND etat = ?", (self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0]
+            multiplicateur *= data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?", ("Infection", self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0]
         return multiplicateur

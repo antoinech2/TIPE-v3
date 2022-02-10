@@ -1,10 +1,15 @@
+from audioop import mul
 from constantes import *
 from dataclasses import dataclass
 import random
 import numpy as np
 
 def probabilite(base, multiplicateur):
-    return base*multiplicateur <= random.random()
+    proba = base*multiplicateur
+#    assert proba <= 1, f"Probabilité supérieure à 1 : {proba}"
+    if proba > 1:
+        pass
+    return proba >= random.random()
 
 @dataclass
 class Strategie:
@@ -12,8 +17,8 @@ class Strategie:
 
 @dataclass
 class SituationInitiale:
-    nombre_infectes : int = 1
-    nombre_hospitalises : int = 1
+    nombre_infectes : int = 2
+    nombre_hospitalises : int = 10
 
 @dataclass
 class Parametres:
@@ -22,8 +27,11 @@ class Parametres:
     infection_duree : tuple[float, float] = (7, 1.5)
     hopital_duree : tuple[float, float] = (40, 1.5)
 
-    hopital_proba = 0.001
-    deces_proba = 7.8e-6
+    infection_proba : float = 4.1e-4
+    hopital_proba : float = 0.0442
+    deces_proba : float = 0.2
+
+    multiplicateur_distance : float = 0.5
 
 class Simulation:
     def __init__(self, population, strategie, situation_init, parametres):
@@ -31,10 +39,12 @@ class Simulation:
         self.strategie = strategie
         self.init = situation_init
         self.param = parametres
+        self.start_simulation()
 
     def start_simulation(self):
         liste_infectes = []
         liste_hospitalises = []
+        liste_decedes = []
 
         # Jour 0 : mise en place de la situation initiale
         infectes_initialisation = random.choices(self.population.individus, k=self.init.nombre_infectes)
@@ -46,12 +56,15 @@ class Simulation:
         hospitalises_initialisation = random.choices(self.population.individus, k=self.init.nombre_hospitalises)
         hospitalises_durees = np.random.normal(*self.param.hopital_duree, self.init.nombre_hospitalises)
         for id, individu in enumerate(hospitalises_initialisation):
-            individu.infecter(round(hospitalises_durees[id]))
+            individu.hospitaliser(round(hospitalises_durees[id]))
             liste_hospitalises.append(individu)
+            liste_infectes.append(individu) if individu not in liste_infectes else liste_infectes
 
         for jour in range(1, self.param.simulation_duree + 1):
             # Nouveau jour
             print(f"Simulation du jour {jour}")
+            if len(liste_infectes) == 0:
+                break
 
             # Traitement des individus qui ont un état à durée limitée
             for individu in liste_hospitalises: #Individus hospitalisés
@@ -59,6 +72,7 @@ class Simulation:
                     # On décide si l'individu redevient sain, ou décède
                     if probabilite(self.param.deces_proba, individu.get_immunite(jour, DECES)):
                         individu.deces()
+                        liste_decedes.append(individu)
                     else:
                         individu.guerir(jour)
                     liste_infectes.remove(individu)
@@ -70,10 +84,16 @@ class Simulation:
                 if individu.sante_duree == 0:
                     # On décide si l'individu redevient sain, ou est hospitalisé
                     if probabilite(self.param.hopital_proba, individu.get_immunite(jour, HOSPITALISATION)):
-                        individu.hospitaliser(np.random.normal(*self.param.hopital_duree))
+                        individu.hospitaliser(round(np.random.normal(*self.param.hopital_duree)))
                         liste_hospitalises.append(individu)
                     else:
                         individu.guerir(jour)
                         liste_infectes.remove(individu)
                 elif individu.sante_duree is not None:
                     individu.sante_duree -= 1
+                    for voisin in map(self.population.get_individu, individu.voisins):
+                        if voisin.sante == NEUTRE and probabilite(self.param.infection_proba, voisin.get_immunite(jour, HOSPITALISATION)*self.param.multiplicateur_distance/max(self.population.get_distance(individu, voisin), 0.31)):
+                            voisin.infecter(round(np.random.normal(*self.param.infection_duree)))
+                            liste_infectes.append(voisin)
+
+            print(f"\033[KRapport du jour {jour} : Infectés : {len(liste_infectes)}, Hospitalisés : {len(liste_hospitalises)}, Décédés : {len(liste_decedes)}")
