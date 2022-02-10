@@ -3,7 +3,7 @@ from propagation import *
 
 #Programme principal
 
-population = Population(10000, 2, 1) #Génère la population et ajoute toutes les données dans la BDD
+population = Population(10000, 1, 2) #Génère la population et ajoute toutes les données dans la BDD
 strategie = Strategie()
 init = SituationInitiale()
 param = Parametres()

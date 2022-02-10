@@ -3,10 +3,6 @@
 class Error(Exception):
     pass
 
-
-#Nombre d'individus
-nb_population = 1000
-
 #Constantes communes aux programmes
 
 #Constantes des identifiants des différents status de l'infection d'une personne
