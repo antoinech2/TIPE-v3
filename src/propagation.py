@@ -1,7 +1,8 @@
 import random
 from dataclasses import dataclass
-import plotly.graph_objects as graph
+
 import numpy as np
+import plotly.graph_objects as graph
 from plotly.subplots import make_subplots
 
 from constantes import *
@@ -107,7 +108,6 @@ class Simulation:
                 elif individu.sante_duree is not None:
                     individu.sante_duree -= 1
                     for (voisin_id, voisin_distance) in individu.voisins:
-
                         voisin = self.population.get_individu(voisin_id)
                         if voisin.sante == NEUTRE and probabilite(self.param.infection_proba, voisin.get_immunite(jour, HOSPITALISATION)*self.param.multiplicateur_distance/max(voisin_distance, 0.31)):
                             voisin.infecter(
@@ -120,5 +120,6 @@ class Simulation:
 
     def afficher_resultats(self):
         figure = graph.Figure()
-        figure.add_trace(graph.Scatter(x=self.population.population_position[:,0], y=self.population.population_position[:,1], mode='markers'))
+        figure.add_trace(graph.Scatter(
+            x=self.population.population_position[:, 0], y=self.population.population_position[:, 1], mode='markers'))
         figure.show()

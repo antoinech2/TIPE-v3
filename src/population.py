@@ -36,20 +36,16 @@ class Population:
 
         self.population_position, y = make_blobs(n_samples=nb_individus, centers=1, center_box=(0,0), cluster_std=variance_pop/1000*nb_individus) #Génération des coordonées
         self.population_position = self.population_position.astype("float16")
-        #self.individus_distance = distance.pdist(self.population_position, "euclidean")
 
         print("Attribution des voisins de chaque individu...")
         for id in range(nb_individus):
             if id % 1000 == 0:
                 print(f"\tCalcul... {id}/{nb_individus} ({(id/nb_individus*100):.2f}%)", end = "\r")
-
+            
             data = dict(alldata[id])
             individu_distance = distance.cdist([self.population_position[id]], self.population_position)
             voisins = np.where(individu_distance < max_distance)[1]
             voisins_valeur = np.extract(individu_distance < max_distance, individu_distance)
-            # voisins = np.array(pop_cur.execute("SELECT id_individu from population WHERE sqrt(power(x_coord - (SELECT x_coord FROM population WHERE id_individu = ?), 2) + power(y_coord - (SELECT y_coord FROM population WHERE id_individu = ?),2)) <= ?", (id, id, max_distance)).fetchall())
-            # if len(voisins) != 0:
-            #     voisins = voisins[:,0]
             self.individus.append(Individu(data["id_individu"], data["age"], (data["x_coord"], data["y_coord"]), data["sexe"], data["activité"], self.calcul_risque_multiplicateur(data), zip(voisins, voisins_valeur)))
 
     def calcul_risque_multiplicateur(self, data):
@@ -67,17 +63,8 @@ class Population:
     def generer_population(self, nb_population, variance_pop):
         """Génère la population en complétant la BDD"""
         print("Génération de la population...")
-        # if DESTROY_TABLE: #On supprime les anciennes tables pour tout regénérer
-        #     try:
-        pop_cur.execute("DROP TABLE population")
-        #         pop_cur.execute("DROP TABLE etat")
-        #         pop_cur.execute("DROP TABLE distance")
-        #     except:
-        #         pass
 
-        #On créer les deux tables.
-        # "population" contient la liste des individus, leur âge et présence de maladie chronique
-        # "etat" contient l'état infectieux de la population, la durée restante de l'état, le rang vaccinal (nombre d'injections) et le type de vaccin
+        pop_cur.execute("DROP TABLE population")
         pop_cur.execute('CREATE TABLE IF NOT EXISTS "population" ("id_individu" INTEGER NOT NULL,"x_coord" REAL,"y_coord" REAL,"age" INTEGER,\
         "sexe" TEXT NOT NULL DEFAULT "femme", "activité" TEXT, "quintile" INTEGER,"tabac" INTEGER NOT NULL DEFAULT 0,"alcool" INTEGER NOT NULL DEFAULT 0,\
         "obésité" INTEGER NOT NULL DEFAULT 0,"diabète" INTEGER NOT NULL DEFAULT 0,"dyslipidémies" INTEGER NOT NULL DEFAULT 0,\
@@ -87,23 +74,7 @@ class Population:
         "mucoviscidose" INTEGER NOT NULL DEFAULT 0,"embolie" INTEGER NOT NULL DEFAULT 0,"cancer" INTEGER NOT NULL DEFAULT 0,\
         "inflammatoire" INTEGER NOT NULL DEFAULT 0,"antidépresseur" INTEGER NOT NULL DEFAULT 0,"neuroleptique" INTEGER NOT NULL DEFAULT 0,\
         "parkinson" INTEGER NOT NULL DEFAULT 0,"démence" INTEGER NOT NULL DEFAULT 0,PRIMARY KEY("id_individu" AUTOINCREMENT))')
-        pop_cur.execute('CREATE TABLE IF NOT EXISTS "etat" (\
-    	"id_individu"	INTEGER NOT NULL,\
-    	"etat_infection"	INTEGER NOT NULL DEFAULT 0,\
-    	"duree_etat_infection"	INTEGER,\
-    	"etat_sante"	INTEGER NOT NULL DEFAULT 0,\
-    	"duree_etat_sante"	INTEGER,\
-    	"rang_vaccin"	INTEGER NOT NULL DEFAULT 0,\
-    	"immunite"	REAL NOT NULL DEFAULT 0,\
-    	PRIMARY KEY("id_individu" AUTOINCREMENT));')
-        pop_cur.execute('CREATE TABLE IF NOT EXISTS "distance" ("id_1" INTEGER NOT NULL, "id_2" INTEGER NOT NULL, "distance" REAL NOT NULL, PRIMARY KEY("id_1", "id_2"))')
         pop_db.commit()
-
-        # if CLEAN_TABLE:
-        #     pop_cur.execute("DELETE FROM etat")
-        #     for i in range(nb_population):
-        #         pop_cur.execute("INSERT INTO etat DEFAULT VALUES")
-
 
         print("Attribution de l'âge...")
         #AGE
@@ -119,14 +90,6 @@ class Population:
                 pop_cur.execute("INSERT INTO population (age) VALUES (?)", (age,))
                 pop_cur.execute("INSERT INTO etat DEFAULT VALUES")
         pop_db.commit()
-
-
-        #print("Attribution des coordonées de chaque individu...")
-        # for id, individu_coord in enumerate(self.population_position):
-        #     if id % 100 == 0:
-        #         print(f"\tCalcul... {id}/{nb_population} ({(id/nb_population*100):.2f}%)", end = "\r")
-        #     pop_cur.execute("UPDATE population SET x_coord = ?, y_coord = ? WHERE id_individu = (SELECT id_individu FROM population WHERE x_coord IS NULL ORDER BY RANDOM() LIMIT 1)", (individu_coord[0], individu_coord[1]))
-        # pop_db.commit()
 
         print("\033[KAttribution du sexe...")
         proportion_homme = data_cur.execute("SELECT proportion FROM repartition_sexe WHERE sexe = 'homme'").fetchall()[0][0]
@@ -177,8 +140,6 @@ class Population:
 
     def get_distance(self, individu_1, individu_2):
         return self.individus_distance[individu_1.id-1][individu_2.id-1]
-        #return distance.euclidean(self.population_position[individu_1.id-1], self.population_position[individu_2.id-1])
-        #return pop_cur.execute("SELECT sqrt(power((SELECT x_coord FROM population WHERE id_individu = ?) - (SELECT x_coord FROM population WHERE id_individu = ?), 2) + power((SELECT y_coord FROM population WHERE id_individu = ?) - (SELECT y_coord FROM population WHERE id_individu = ?),2))", (individu_1.id, individu_2.id, individu_1.id, individu_2.id)).fetchall()[0][0]
 
     def get_individu(self, id):
         return self.individus[id-1]
