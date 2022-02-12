@@ -143,6 +143,9 @@ class Population:
     def get_individu(self, id):
         return self.individus[id-1]
 
+    def get_nombre_vaccination(self, jour_vaccination):
+        return data_cur.execute("SELECT vaccin, doses from doses_vaccination WHERE jour = ?", (jour_vaccination, )).fetchall()
+
 def close_database():
     """Ferme les curseur et les BDD"""
     pop_cur.close()
@@ -193,6 +196,10 @@ class Individu:
         self.sante_duree = None
         self.infection_duree = None
 
+    def vacciner(self, vaccin_type, jour):
+        self.vaccin_type = vaccin_type
+        self.vaccin_date = jour
+
     def get_immunite(self, jour, type):
         if type == INFECTION:
             multiplicateur = 1
@@ -202,7 +209,8 @@ class Individu:
             multiplicateur = self.multiplicateur[1]
         if self.vaccin_type is not None:
             mois_vaccin = (jour - self.vaccin_date)/30.5
-            multiplicateur *= (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?", (self.vaccin_type, self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
+            if mois_vaccin <= 12:
+                multiplicateur *= (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?", (self.vaccin_type, self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
         elif self.infection_immunite_date is not None:
             mois_vaccin = (jour - self.infection_immunite_date)/30.5
             result = (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?", ("Infection", self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])

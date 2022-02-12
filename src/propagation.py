@@ -41,6 +41,9 @@ class Parametres:
 
     multiplicateur_distance: float = 0.5
 
+    jour_debut_vaccination : int = 1
+    taille_population_vaccination : int = 67000000
+
 
 class Simulation:
     def __init__(self, population, strategie, situation_init, parametres):
@@ -56,7 +59,8 @@ class Simulation:
             "nouveaux_infectes": [0],
             "nouveaux_hospitalises": [0],
             "nouveaux_decedes": [0],
-            "nouveaux_gueris": [0]
+            "nouveaux_gueris": [0],
+            "vaccines" : [0]
         }
 
         self.start_simulation()
@@ -65,18 +69,20 @@ class Simulation:
         liste_infectes = []
         liste_hospitalises = []
         liste_decedes = []
+        liste_vaccines = []
+        liste_non_vaccines = [individu for individu in self.population.individus if individu.age >= 12]
 
         # Jour 0 : mise en place de la situation initiale
-        infectes_initialisation = random.choices(
-            self.population.individus, k=self.init.nombre_infectes)
+        infectes_initialisation = random.sample(
+            self.population.individus, self.init.nombre_infectes)
         infectes_durees = np.random.normal(
             *self.param.infection_duree, self.init.nombre_infectes)
         for id, individu in enumerate(infectes_initialisation):
             individu.infecter(round(infectes_durees[id]))
             liste_infectes.append(individu)
 
-        hospitalises_initialisation = random.choices(
-            self.population.individus, k=self.init.nombre_hospitalises)
+        hospitalises_initialisation = random.sample(
+            self.population.individus, self.init.nombre_hospitalises)
         hospitalises_durees = np.random.normal(
             *self.param.hopital_duree, self.init.nombre_hospitalises)
         for id, individu in enumerate(hospitalises_initialisation):
@@ -137,8 +143,18 @@ class Simulation:
                             liste_infectes.append(voisin)
                             nouveaux_infectes += 1
 
+            # Vaccination
+            if jour >= self.param.jour_debut_vaccination:
+                for (vaccin_type, nombre_doses) in self.population.get_nombre_vaccination(jour-self.param.jour_debut_vaccination+1):
+                    nombre_doses = round(nombre_doses*len(self.population.individus)/self.param.taille_population_vaccination)
+                    vaccines = random.sample(liste_non_vaccines, nombre_doses)
+                    for individu in vaccines:
+                        liste_non_vaccines.remove(individu)
+                        liste_vaccines.append(individu)
+                        individu.vacciner(vaccin_type, jour)
+
             print(
-                f"\033[KRapport du jour {jour} : Infectés : {len(liste_infectes)}, Hospitalisés : {len(liste_hospitalises)}, Décédés : {len(liste_decedes)}")
+                f"\033[KRapport du jour {jour} : Infectés : {len(liste_infectes)}, Hospitalisés : {len(liste_hospitalises)}, Décédés : {len(liste_decedes)}, Vaccinés : {len(liste_vaccines)}")
 
             self.stats["total_infectes"].append(len(liste_infectes))
             self.stats["total_hospitalises"].append(len(liste_hospitalises))
@@ -147,6 +163,7 @@ class Simulation:
             self.stats["nouveaux_hospitalises"].append(nouveaux_hospitalises)
             self.stats["nouveaux_decedes"].append(nouveaux_decedes)
             self.stats["nouveaux_gueris"].append(nouveaux_gueris)
+            self.stats["vaccines"].append(len(liste_vaccines))
 
         print("=== Fin de la simulation ===")
 
@@ -155,6 +172,8 @@ class Simulation:
     def get_couleur(self, individu):
         if individu.sante != NEUTRE:
             return COULEUR[individu.sante]
+        elif individu.vaccin_date is not None:
+            return COULEUR["VACCINE"]        
         elif individu.infection_immunite_date is not None:
             return COULEUR["IMMUNISE"]
         else:
@@ -182,6 +201,8 @@ class Simulation:
             x=jours_liste, y=self.stats["total_hospitalises"], mode='markers+lines', name="Total hospitalisés", legendgroup="totaux"), 2, 1)
         figure.add_trace(graph.Scatter(
             x=jours_liste, y=self.stats["total_decedes"], mode='markers+lines', name="Total décédés", legendgroup="totaux"), 2, 1)
+        figure.add_trace(graph.Scatter(
+            x=jours_liste, y=self.stats["vaccines"], mode='markers+lines', name="Vaccinés", legendgroup="totaux"), 2, 1)
 
         figure.add_trace(graph.Scatter(
             x=jours_liste, y=self.stats["nouveaux_gueris"], mode='markers+lines', name="Nouveaux guéris", legendgroup="journalier"), 2, 2)
