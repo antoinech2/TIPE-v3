@@ -22,35 +22,20 @@ NEUTRE = 0
 ISOLE = 1
 HOSPITALISE = 2
 
-#Situation initiale :
-SITUATION_INITIALE = {
-"INFECTE" : 0.1,
-"HOSPITALISE" : 0.05,
-"REANIMATION" : 0.002
-}
-
-#Durée des phases infectieuses
-DUREE = {
-"INFECTE" : [7, 15],
-#IMMUNISE : [50, 75]
-}
-
-
 
 #Constantes des libbelés des états sur le graphe final
-NAME = {
-"MORT" : "décédé",
-"NEUTRE" : "neutre",
-"INFECTE" : "infecté",
-#SAIN : "sain",
-#IMMUNISE : "immunisé"
+LIBELE = {
+DECEDE : "Décédé",
+NEUTRE : "Sain",
+INFECTE : "Infecté",
+HOSPITALISE : "Hospitalisé",
 }
 
 #Couleur des points représentatifs de chaque état sur le graphe
-COLOR = {
-"MORT" : ['#AB63FA', '#AB63FA'],
-"NEUTRE" : ['#636EFA', '#636EFA'],
-"INFECTE" : ['#EF553B', '#EF553B'],
-#SAIN : [],
-#IMMUNISE : ['#00CC96', '#00CC96']
+COULEUR = {
+DECEDE : ['#474747', '#000000'],
+NEUTRE : ['#0cf036', '#069420'],
+INFECTE : ['#0a4b6e', '#07334a'],
+HOSPITALISE : ['#960606', '#690404'],
+"IMMUNISE" : ['#fcba03', '#876300']
 }

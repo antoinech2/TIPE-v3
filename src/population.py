@@ -28,13 +28,13 @@ maladie_liste = ["obésité", "diabète", "dyslipidémies", "métabolique", "hyp
 class Population:
     def __init__(self, nb_individus, variance_pop, max_distance):
         if REGENERATE_POPULATION:
-            self.generer_population(nb_individus, variance_pop)
+            self.generer_population(nb_individus)
         pop_db.row_factory = sqlite3.Row
         pop_cur = pop_db.cursor()
         self.individus = []
         alldata = pop_cur.execute("SELECT * from population").fetchall()
 
-        self.population_position, y = make_blobs(n_samples=nb_individus, centers=1, center_box=(0,0), cluster_std=variance_pop/1000*nb_individus) #Génération des coordonées
+        self.population_position, y = make_blobs(n_samples=nb_individus, centers=1, center_box=(0,0), cluster_std=variance_pop) #Génération des coordonées
         self.population_position = self.population_position.astype("float16")
 
         print("Attribution des voisins de chaque individu...")
@@ -46,7 +46,7 @@ class Population:
             individu_distance = distance.cdist([self.population_position[id]], self.population_position)
             voisins = np.where(individu_distance < max_distance)[1]
             voisins_valeur = np.extract(individu_distance < max_distance, individu_distance)
-            self.individus.append(Individu(data["id_individu"], data["age"], (data["x_coord"], data["y_coord"]), data["sexe"], data["activité"], self.calcul_risque_multiplicateur(data), zip(voisins, voisins_valeur)))
+            self.individus.append(Individu(data["id_individu"], data["age"], data["sexe"], data["activité"], self.calcul_risque_multiplicateur(data), list(zip(voisins, voisins_valeur))))
 
     def calcul_risque_multiplicateur(self, data):
         multiplicateur = np.array(data_cur.execute("SELECT probar_hopital, probar_deces from age WHERE min <= ? AND max >= ?", (data["age"], data["age"])).fetchall()[0])
@@ -60,12 +60,12 @@ class Population:
                 multiplicateur *= np.array(data_cur.execute("SELECT probar_hopital, probar_deces from maladie WHERE nom = ?", (maladie, )).fetchall()[0])
         return multiplicateur[0], multiplicateur[1]
 
-    def generer_population(self, nb_population, variance_pop):
+    def generer_population(self, nb_population):
         """Génère la population en complétant la BDD"""
         print("Génération de la population...")
 
         pop_cur.execute("DROP TABLE population")
-        pop_cur.execute('CREATE TABLE IF NOT EXISTS "population" ("id_individu" INTEGER NOT NULL,"x_coord" REAL,"y_coord" REAL,"age" INTEGER,\
+        pop_cur.execute('CREATE TABLE IF NOT EXISTS "population" ("id_individu" INTEGER NOT NULL,"age" INTEGER,\
         "sexe" TEXT NOT NULL DEFAULT "femme", "activité" TEXT, "quintile" INTEGER,"tabac" INTEGER NOT NULL DEFAULT 0,"alcool" INTEGER NOT NULL DEFAULT 0,\
         "obésité" INTEGER NOT NULL DEFAULT 0,"diabète" INTEGER NOT NULL DEFAULT 0,"dyslipidémies" INTEGER NOT NULL DEFAULT 0,\
         "métabolique" INTEGER NOT NULL DEFAULT 0,"hypertension" INTEGER NOT NULL DEFAULT 0,"coronariennes" INTEGER NOT NULL DEFAULT 0,\
@@ -88,7 +88,6 @@ class Population:
                 nb_individu_age = round(data_cur.execute("SELECT proportion FROM age_detail WHERE age = ?", (age,)).fetchall()[0][0] * nb_population)
             for individu in range(nb_individu_age): #On ajoute les individus dans la BDD avec l'âge voulu
                 pop_cur.execute("INSERT INTO population (age) VALUES (?)", (age,))
-                pop_cur.execute("INSERT INTO etat DEFAULT VALUES")
         pop_db.commit()
 
         print("\033[KAttribution du sexe...")
@@ -152,11 +151,10 @@ def close_database():
     data_db.close()
 
 class Individu:
-    def __init__(self, id, age, position, sexe, activite, multiplicateur, liste_voisins):
+    def __init__(self, id, age, sexe, activite, multiplicateur, liste_voisins):
         # Caractéristiques
         self.id = id
         self.age = age
-        self.position = position
         self.sexe = sexe
         self.activite = activite
         self.multiplicateur = multiplicateur
@@ -204,8 +202,9 @@ class Individu:
             multiplicateur = self.multiplicateur[1]
         if self.vaccin_type is not None:
             mois_vaccin = (jour - self.vaccin_date)/30.5
-            multiplicateur *= data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?", (self.vaccin_type, self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0]
-        if self.infection_immunite_date is not None:
+            multiplicateur *= (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?", (self.vaccin_type, self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
+        elif self.infection_immunite_date is not None:
             mois_vaccin = (jour - self.infection_immunite_date)/30.5
-            multiplicateur *= data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?", ("Infection", self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0]
+            result = (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?", ("Infection", self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
+            multiplicateur *= result
         return multiplicateur
