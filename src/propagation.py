@@ -1,48 +1,57 @@
+"""Modèle de propagation de la simulation"""
+
+# Modules externes
+
 import random
 from dataclasses import dataclass
-
 import numpy as np
 import plotly.graph_objects as graph
 from plotly.subplots import make_subplots
 
+# Module interne
+
 from constantes import *
 
-
 def probabilite(base, multiplicateur):
-    proba = base*multiplicateur
-#    assert proba <= 1, f"Probabilité supérieure à 1 : {proba}"
-    if proba > 1:
-        #print(f"Probabilité dépassée : {proba}")
-        pass
-    return proba >= random.random()
+    """Renvoie vrai ou faux selon une probabilité de base et un multiplicateur"""
+    return base*multiplicateur >= random.random()
 
 
 @dataclass
 class Strategie:
-    pass
+    """Représente une stratégie vaccinale"""
+    # Jour du début de la campagne de vaccination
+    jour_debut_vaccination : int = 1
+
+    # Population de référence pour les données de vaccination
+    taille_population_vaccination : int = 67813396 # Source : Insee 2022
 
 
 @dataclass
 class SituationInitiale:
+    """Représente la situation initiale de l'état de santé de la population au jour 0"""
+    # Nombre d'infectés et hospitalisés initialement (jour 0)
     nombre_infectes: int = 16
     nombre_hospitalises: int = 4
 
 
 @dataclass
 class Parametres:
+    """Représente les paramètres de la simulation"""
+    #Durée maximale de la simulation (en jour)
     simulation_duree: int = 300
 
+    # Durée d'une infection et d'une hospitalisation ((moyenne, écart type) selon une loi de distibution normale)
     infection_duree: tuple[float, float] = (7, 1.5)
     hopital_duree: tuple[float, float] = (30, 1.5)
 
+    # Probabilité de base d'infection, hospitalisation et décès
     infection_proba: float = 4.1e-4
     hopital_proba: float = 0.0442
     deces_proba: float = 0.2
 
+    # Multiplicateur due à la distance entre les individus
     multiplicateur_distance: float = 0.5
-
-    jour_debut_vaccination : int = 1
-    taille_population_vaccination : int = 67000000
 
 
 class Simulation:
@@ -144,9 +153,9 @@ class Simulation:
                             nouveaux_infectes += 1
 
             # Vaccination
-            if jour >= self.param.jour_debut_vaccination:
-                for (vaccin_type, nombre_doses) in self.population.get_nombre_vaccination(jour-self.param.jour_debut_vaccination+1):
-                    nombre_doses = round(nombre_doses*len(self.population.individus)/self.param.taille_population_vaccination)
+            if jour >= self.strategie.jour_debut_vaccination:
+                for (vaccin_type, nombre_doses) in self.population.get_nombre_vaccination(jour-self.strategie.jour_debut_vaccination+1):
+                    nombre_doses = round(nombre_doses*len(self.population.individus)/self.strategie.taille_population_vaccination)
                     vaccines = random.sample(liste_non_vaccines, nombre_doses)
                     for individu in vaccines:
                         liste_non_vaccines.remove(individu)

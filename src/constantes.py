@@ -1,27 +1,21 @@
-#Paramètres de la simulation
+"""Constantes d'état et d'affichage grapique"""
 
-class Error(Exception):
-    pass
-
-#Constantes communes aux programmes
-
-#Constantes des identifiants des différents status de l'infection d'une personne
+#Constantes des identifiants des différents statuts de l'infection d'une personne
 
 #Types d'états
 INFECTION = 1
 HOSPITALISATION = 2
 DECES = 3
 
-#Etat santé
+#Etats de santé
 DECEDE = -1
 NEUTRE = 0
 INFECTE = 1
 
-#Etat infection
+#Etats d'infection
 NEUTRE = 0
 ISOLE = 1
 HOSPITALISE = 2
-
 
 #Constantes des libbelés des états sur le graphe final
 LIBELE = {
@@ -31,7 +25,7 @@ INFECTE : "Infecté",
 HOSPITALISE : "Hospitalisé",
 }
 
-#Couleur des points représentatifs de chaque état sur le graphe
+#Couleur des points représentatifs de chaque état sur le graphe final
 COULEUR = {
 DECEDE : ['#474747', '#000000'],
 NEUTRE : ['#0cf036', '#069420'],
