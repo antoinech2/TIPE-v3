@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import numpy as np
 import plotly.graph_objects as graph
 from plotly.subplots import make_subplots
+from time import time
+from math import ceil
 
 # Module interne
 
@@ -20,6 +22,9 @@ def probabilite(base, multiplicateur):
 @dataclass
 class Strategie:
     """Représente une stratégie vaccinale"""
+
+    dates_vaccination : list[tuple[int,dict]]
+
     # Jour du début de la campagne de vaccination
     jour_debut_vaccination : int = 1
 
@@ -75,6 +80,8 @@ class Simulation:
         self.start_simulation()
 
     def start_simulation(self):
+        temps_depart = time()
+
         liste_infectes = []
         liste_hospitalises = []
         liste_decedes = []
@@ -104,7 +111,6 @@ class Simulation:
 
         for jour in range(1, self.param.simulation_duree + 1):
             # Nouveau jour
-            #print(f"Simulation du jour {jour}")
             if len(liste_infectes) == 0:
                 break
 
@@ -155,15 +161,21 @@ class Simulation:
             # Vaccination
             if jour >= self.strategie.jour_debut_vaccination:
                 for (vaccin_type, nombre_doses) in self.population.get_nombre_vaccination(jour-self.strategie.jour_debut_vaccination+1):
+                    # Calcul du nombre de doses effective sur la taille de la population de la simulation
                     nombre_doses = round(nombre_doses*len(self.population.individus)/self.strategie.taille_population_vaccination)
-                    vaccines = random.sample(liste_non_vaccines, nombre_doses)
-                    for individu in vaccines:
-                        liste_non_vaccines.remove(individu)
-                        liste_vaccines.append(individu)
-                        individu.vacciner(vaccin_type, jour)
+                    random.shuffle(liste_non_vaccines)
+                    doses_distribuees = 0
+                    for individu in liste_non_vaccines:
+                        if doses_distribuees >= nombre_doses:
+                            break
+                        if individu.sante == NEUTRE and individu.eligible_vaccin(jour-self.strategie.jour_debut_vaccination+1, self.strategie):
+                            liste_non_vaccines.remove(individu)
+                            liste_vaccines.append(individu)
+                            individu.vacciner(vaccin_type, jour)
+                            doses_distribuees += 1
 
             print(
-                f"\033[KRapport du jour {jour} : Infectés : {len(liste_infectes)}, Hospitalisés : {len(liste_hospitalises)}, Décédés : {len(liste_decedes)}, Vaccinés : {len(liste_vaccines)}")
+                f"\033[KRapport du jour {jour} : Infectés : {len(liste_infectes)}, Hospitalisés : {len(liste_hospitalises)}, Décédés : {len(liste_decedes)}, Vaccinés : {len(liste_vaccines)}, Temps d'éxécution : {round(time() - temps_depart)}s")
 
             self.stats["total_infectes"].append(len(liste_infectes))
             self.stats["total_hospitalises"].append(len(liste_hospitalises))
@@ -174,7 +186,7 @@ class Simulation:
             self.stats["nouveaux_gueris"].append(nouveaux_gueris)
             self.stats["vaccines"].append(len(liste_vaccines))
 
-        print("=== Fin de la simulation ===")
+        print(f"=== Fin de la simulation (en {round(time() - temps_depart)} secondes) ===")
 
         self.afficher_resultats()
 
@@ -232,6 +244,6 @@ class Simulation:
             marker={"size": 4},
             mode="lines+markers",
             row=2)
-        figure.update_layout(legend=dict(orientation = "h", yanchor="bottom"))
+        #figure.update_layout(legend=dict(orientation = "h", yanchor="bottom"))
 
         figure.show()

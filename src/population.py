@@ -249,3 +249,20 @@ class Individu:
             result = (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?", ("Infection", self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
             multiplicateur *= result
         return multiplicateur
+
+    def eligible_vaccin(self, vaccination_jour, strategie):
+        """Renvoie si l'individu est eligible à une dose de vaccination à la date donnée."""
+        for clause in [strategie.dates_vaccination[x][1] for x in range(len(strategie.dates_vaccination)) if strategie.dates_vaccination[x][0] <= vaccination_jour]:
+            valide = True
+            if self.age <= 12:
+                valide = False
+            if "age" in clause and clause["comp"] == "sup" and self.age < clause["age"]:
+                valide = False
+            elif "age" in clause and clause["comp"] == "inf" and self.age > clause["age"]:
+                valide = False
+            elif "emploi" in clause and self.activite != clause["emploi"]:
+                valide = False
+            
+            if valide:
+                return True
+        return False
