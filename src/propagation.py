@@ -55,10 +55,6 @@ class Parametres:
     hopital_proba: float = 0.0442
     deces_proba: float = 0.2
 
-    # Multiplicateur due à la distance entre les individus
-    multiplicateur_distance: float = 0.5
-
-
 class Simulation:
     def __init__(self, population, strategie, situation_init, parametres):
         self.population = population
@@ -119,6 +115,8 @@ class Simulation:
             nouveaux_decedes = 0
             nouveaux_gueris = 0
 
+            doses_a_distribuer = 0
+
             # Traitement des individus qui ont un état à durée limitée
             for individu in liste_hospitalises:  # Individus hospitalisés
                 if individu.infection_duree == 0:
@@ -127,6 +125,7 @@ class Simulation:
                         individu.deces()
                         liste_decedes.append(individu)
                         nouveaux_decedes += 1
+                        #print(f"Décès : {individu.age}, vaccin : {jour - individu.vaccin_date if individu.vaccin_date is not None else -1}")
                     else:
                         individu.guerir(jour)
                         nouveaux_gueris += 1
@@ -152,7 +151,7 @@ class Simulation:
                     individu.sante_duree -= 1
                     for (voisin_id, voisin_distance) in individu.voisins:
                         voisin = self.population.get_individu(voisin_id)
-                        if voisin.sante == NEUTRE and probabilite(self.param.infection_proba, voisin.get_immunite(jour, INFECTION)*self.param.multiplicateur_distance/max(voisin_distance**2, 0.2)):
+                        if voisin.sante == NEUTRE and probabilite(self.param.infection_proba, voisin.get_immunite(jour, INFECTION)/max(voisin_distance, 0.2)):
                             voisin.infecter(
                                 round(np.random.normal(*self.param.infection_duree)))
                             liste_infectes.append(voisin)
@@ -162,17 +161,17 @@ class Simulation:
             if jour >= self.strategie.jour_debut_vaccination:
                 for (vaccin_type, nombre_doses) in self.population.get_nombre_vaccination(jour-self.strategie.jour_debut_vaccination+1):
                     # Calcul du nombre de doses effective sur la taille de la population de la simulation
-                    nombre_doses = round(nombre_doses*len(self.population.individus)/self.strategie.taille_population_vaccination)
+                    doses_a_distribuer += round(nombre_doses*len(self.population.individus)/self.strategie.taille_population_vaccination)
                     random.shuffle(liste_non_vaccines)
-                    doses_distribuees = 0
                     for individu in liste_non_vaccines:
-                        if doses_distribuees >= nombre_doses:
+                        if doses_a_distribuer <= 0:
                             break
                         if individu.sante == NEUTRE and individu.eligible_vaccin(jour-self.strategie.jour_debut_vaccination+1, self.strategie):
                             liste_non_vaccines.remove(individu)
                             liste_vaccines.append(individu)
                             individu.vacciner(vaccin_type, jour)
-                            doses_distribuees += 1
+                            doses_a_distribuer -= 1
+                            print(f"Vacciné : Jour : {jour}, âge : {individu.age}, activité : {individu.activite}")
 
             print(
                 f"\033[KRapport du jour {jour} : Infectés : {len(liste_infectes)}, Hospitalisés : {len(liste_hospitalises)}, Décédés : {len(liste_decedes)}, Vaccinés : {len(liste_vaccines)}, Temps d'éxécution : {round(time() - temps_depart)}s")
