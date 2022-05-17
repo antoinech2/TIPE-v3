@@ -171,7 +171,7 @@ class Simulation:
                             liste_vaccines.append(individu)
                             individu.vacciner(vaccin_type, jour)
                             doses_a_distribuer -= 1
-                            print(f"Vacciné : Jour : {jour}, âge : {individu.age}, activité : {individu.activite}")
+                            #print(f"Vacciné : Jour : {jour}, âge : {individu.age}, activité : {individu.activite}")
 
             print(
                 f"\033[KRapport du jour {jour} : Infectés : {len(liste_infectes)}, Hospitalisés : {len(liste_hospitalises)}, Décédés : {len(liste_decedes)}, Vaccinés : {len(liste_vaccines)}, Temps d'éxécution : {round(time() - temps_depart)}s")

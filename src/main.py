@@ -22,11 +22,11 @@ if __name__ == "__main__":
     ])
     init = SituationInitiale()
     param = Parametres(
-        simulation_duree=500,infection_proba=0.013, deces_proba=0.001
+        simulation_duree=500,infection_proba=0.01249, deces_proba=0.001
     )
 
     # Démarrage la simulation avec les paramètres définis et affichage des résultats
     Simulation(population, strategie_reelle, init, param)
-    #population = Population(10000, 10, 1)
-    #Simulation(population, strategie_comparee, init, param)
+    population = Population(10000, 10, 1)
+    Simulation(population, strategie_comparee, init, param)
     close_database() #Fermeture la connexion à la base de donnée
