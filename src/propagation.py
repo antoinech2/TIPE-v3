@@ -9,7 +9,6 @@ from time import time
 
 import numpy as np
 import plotly.graph_objects as graph
-from plotly.subplots import make_subplots
 
 # Module interne
 from constantes import *
@@ -165,7 +164,7 @@ class Simulation:
                     # Infection potentielle des voisins
                     for (voisin_id, voisin_distance) in individu.voisins:
                         voisin = self.population.get_individu(voisin_id)
-                        if voisin.sante == NEUTRE and probabilite(self.param.infection_proba, voisin.get_immunite(jour, INFECTION)/max(voisin_distance, 0.2)):
+                        if voisin.sante == NEUTRE and probabilite(self.param.infection_proba, voisin.get_immunite(jour, INFECTION)/(1+voisin_distance)):
                             # Infection du voisin
                             voisin.infecter(
                                round(np.random.normal(*self.param.infection_duree)))

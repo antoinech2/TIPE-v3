@@ -13,9 +13,6 @@ from sklearn.datasets import make_blobs
 # Module interne
 from constantes import *
 
-# Regénérer ou non une nouvelle population lors de l'éxécution de la simulation
-REGENERE_POPULATION = True
-
 # Chemin de la base de donnée qui contient les données réelle sur la répartition de la population, les probabilités d'hospitalisation et de décés, ainsi que l'efficacité des vaccins
 database_loc_data = "res/simulation_data.db"
 # Chemin de la base de donnée qui contient la liste des individus de la population générée, et les états infectieux
@@ -35,8 +32,8 @@ MALADIE_LISTE = ["obésité", "diabète", "dyslipidémies", "métabolique", "hyp
 class Population:
     """Représente une population d'individus"""
 
-    def __init__(self, nb_individus, variance_pop, max_distance):
-        if REGENERE_POPULATION:
+    def __init__(self, nb_individus, variance_pop, max_distance, regenere):
+        if regenere: # Regénérer ou non une nouvelle population
             # Génère la population dans la base de donnée.
             self.generer_population(nb_individus)
 
@@ -209,7 +206,6 @@ class Population:
     def get_nombre_vaccination(self, jour_vaccination):
         """Renvoie le nombre de personnes à vacciner selon chaque vaccin en fonction du jour de vaccination"""
         return data_cur.execute("SELECT vaccin, doses from doses_vaccination WHERE jour = ?", (jour_vaccination, )).fetchall()
-
 
 def ferme_bdd():
     """Ferme les curseurs et les connexions aux bases de données"""
