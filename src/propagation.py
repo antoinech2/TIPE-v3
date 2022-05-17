@@ -136,7 +136,6 @@ class Simulation:
                         individu.deces()
                         liste_decedes.append(individu)
                         nouveaux_decedes += 1
-                        #print(f"Décès : {individu.age}, vaccin : {jour - individu.vaccin_date if individu.vaccin_date is not None else -1}")
                     else:
                         individu.guerir(jour)
                         nouveaux_gueris += 1

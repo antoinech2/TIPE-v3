@@ -240,6 +240,9 @@ class Individu:
         # Etat d'immunité suite à une infection
         self.infection_immunite_date = None
 
+        self.cache_immunite = None
+        self.cache_immunite_date = 0
+
     def infecter(self, duree):
         """Infecte l'individu"""
         self.sante = INFECTE
@@ -259,6 +262,7 @@ class Individu:
         self.infection = NEUTRE
         self.infection_duree = None
         self.infection_immunite_date = jour
+        self.cache_immunite = None
 
     def deces(self):
         """Rend l'individu décédé suite à une hospitalisation"""
@@ -270,30 +274,38 @@ class Individu:
         """Vaccine l'individu avec un vaccin spécifié"""
         self.vaccin_type = vaccin_type
         self.vaccin_date = jour
+        self.cache_immunite = None
 
     def get_immunite(self, jour, type):
         """Renvoie l'immunité de l'individu en fonction du type de risque"""
-        if type == INFECTION:
-            multiplicateur = 1
-        # Dans le cas d'une hospitalisation ou d'un décès, on se base sur le risque établi en fonction des caractéristiques de l'individu
-        elif type == HOSPITALISATION:
-            multiplicateur = self.multiplicateur[0]
-        elif type == DECES:
-            multiplicateur = self.multiplicateur[1]
 
-        # Immunité due au vaccin
-        if self.vaccin_type is not None:
-            mois_vaccin = (jour - self.vaccin_date)/30.5
-            # On récupère l'efficacité de la vaccination en fonction du vaccin et de la durée depuis la vaccination
-            multiplicateur *= (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?",
-                                                  (self.vaccin_type, self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
+        if self.cache_immunite is not None and jour - self.cache_immunite_date < 30:
+            return self.cache_immunite[type-1]
 
-        # Immunité due à une infection
-        elif self.infection_immunite_date is not None:
-            mois_vaccin = (jour - self.infection_immunite_date)/30.5
-            multiplicateur *= (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?",
-                                                  ("Infection", self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
-        return multiplicateur
+        else:
+            self.cache_immunite = [1,1,1]
+            for type in [1,2,3]:
+                if type == INFECTION:
+                    self.cache_immunite[type-1] = 1
+                # Dans le cas d'une hospitalisation ou d'un décès, on se base sur le risque établi en fonction des caractéristiques de l'individu
+                elif type == HOSPITALISATION:
+                    self.cache_immunite[type-1] = self.multiplicateur[0]
+                elif type == DECES:
+                    self.cache_immunite[type-1] = self.multiplicateur[1]
+
+                # Immunité due au vaccin
+                if self.vaccin_type is not None:
+                    mois_vaccin = (jour - self.vaccin_date)/30.5
+                    # On récupère l'efficacité de la vaccination en fonction du vaccin et de la durée depuis la vaccination
+                    self.cache_immunite[type-1] *= (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?",
+                                                        (self.vaccin_type, self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
+                # Immunité due à une infection
+                elif self.infection_immunite_date is not None:
+                    mois_vaccin = (jour - self.infection_immunite_date)/30.5
+                    self.cache_immunite[type-1] *= (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?",
+                                                        ("Infection", self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
+            self.cache_immunite_date = jour
+            return self.cache_immunite[type-1]
 
     def eligible_vaccin(self, vaccination_jour, strategie):
         """Renvoie si l'individu est eligible à une dose de vaccination à la date donnée."""

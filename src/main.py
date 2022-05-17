@@ -9,7 +9,7 @@ from propagation import *
 
 if __name__ == "__main__":
     # Définition des objets d'entrée
-    population = Population(10000, 10, 1, True) #Génère la population et ajoute toutes les données dans la BDD
+    population = Population(10000, 10, 5, True) #Génère la population et ajoute toutes les données dans la BDD
     
     # Définition des stratégies
     strategie_reelle = Strategie(dates_vaccination=[
@@ -25,10 +25,10 @@ if __name__ == "__main__":
     
     # Situation initiale
     init = SituationInitiale(nombre_infectes = 16, nombre_hospitalises = 4)
-    param = Parametres(simulation_duree=500,infection_proba=0.04, hopital_proba=0.0442, deces_proba=0.001)
+    param = Parametres(simulation_duree=500,infection_proba=0.004, hopital_proba=0.0442, deces_proba=0.001)
 
     # Démarrage la simulation avec les paramètres définis et affichage des résultats
     Simulation(population, strategie_reelle, init, param, "Stratégie réelle")
-    population = Population(10000, 10, 1, False)
+    population = Population(10000, 10, 5, False)
     Simulation(population, strategie_comparee, init, param, "Stratégie comparée")
     ferme_bdd() #Fermeture la connexion à la base de donnée
