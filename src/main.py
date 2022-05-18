@@ -20,7 +20,7 @@ if __name__ == "__main__":
     (0, {"age" : 25, "comp" : "inf"}), 
     (100, {"age" : 40, "comp" : "inf"}), (145, {"age" : 50, "comp" : "inf"}),
     (165, {"age" : 50, "emploi" : "santé", "comp" : "sup"}), 
-    (175, {"age" : 50, "emploi" : "médico-social", "comp" : "sup"}),(183, {"age" : 60, "comp" : "inf"}), (200, {"age" : 85, "comp" : "inf"}), (300, {"age" : 85, "comp" : "sup"})
+    (175, {"age" : 50, "emploi" : "médico-social", "comp" : "sup"}),(183, {"age" : 60, "comp" : "inf"}), (200, {"age" : 85, "comp" : "inf"}), (250, {"age" : 85, "comp" : "sup"})
     ])
     
     # Situation initiale
