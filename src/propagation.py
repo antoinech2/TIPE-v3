@@ -149,8 +149,7 @@ class Simulation:
                 if individu.sante_duree == 0:
                     # On décide si l'individu redevient sain, ou est hospitalisé
                     if probabilite(self.param.hopital_proba, individu.get_immunite(jour, HOSPITALISATION)):
-                        individu.hospitaliser(
-                            round(np.random.normal(*self.param.hopital_duree)))
+                        individu.hospitaliser( round(np.random.normal(*self.param.hopital_duree)))
                         liste_hospitalises.append(individu)
                         nouveaux_hospitalises += 1
                     else:
@@ -165,22 +164,20 @@ class Simulation:
                         voisin = self.population.get_individu(voisin_id)
                         if voisin.sante == NEUTRE and probabilite(self.param.infection_proba, voisin.get_immunite(jour, INFECTION)/(1+voisin_distance)):
                             # Infection du voisin
-                            voisin.infecter(
-                               round(np.random.normal(*self.param.infection_duree)))
+                            voisin.infecter(round( np.random.normal(*self.param.infection_duree)))
                             liste_infectes.append(voisin)
                             nouveaux_infectes += 1
 
             # Vaccination
             if jour >= self.strategie.jour_debut_vaccination:
-                for (vaccin_type, nombre_doses) in self.population.get_nombre_vaccination(jour-self.strategie.jour_debut_vaccination+1):
+                for (vaccin_type, nombre_doses) in self.population.get_nombre_vaccination(jour - self.strategie.jour_debut_vaccination+1):
                     # Calcul du nombre de doses effective sur la taille de la population de la simulation
-                    doses_a_distribuer += round(nombre_doses*len(
-                        self.population.individus)/self.strategie.taille_population_vaccination)
+                    doses_a_distribuer += round(nombre_doses * len(self.population.individus) / self.strategie.taille_population_vaccination)
                     random.shuffle(liste_non_vaccines)
                     for individu in liste_non_vaccines:
                         if doses_a_distribuer <= 0:
                             break
-                        if individu.sante == NEUTRE and individu.eligible_vaccin(jour-self.strategie.jour_debut_vaccination+1, self.strategie):
+                        if individu.sante == NEUTRE and individu.eligible_vaccin(jour - self.strategie.jour_debut_vaccination+1, self.strategie):
                             # Vaccination de l'individu s'il est éligible
                             liste_non_vaccines.remove(individu)
                             liste_vaccines.append(individu)

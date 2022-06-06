@@ -168,9 +168,7 @@ class Population:
 
         # On boucle sur toutes les maladie, avec leur proportion dans la population
         for (avancement, (maladie, proportion_maladie)) in enumerate(data_cur.execute("SELECT nom, proportion FROM maladie").fetchall()):
-            print(
-                f"\tAttribution de la maladie {avancement+1}/{nb_maladie} ({(avancement+1/nb_maladie*100):.2f}%) ('{maladie}')", end="\r")
-
+            print(f"\tAttribution de la maladie {avancement+1}/{nb_maladie} ({(avancement+1/nb_maladie*100):.2f}%) ('{maladie}')", end="\r")
             # On boucle sur les individus
             for (avancement_pop, (id_individu, age)) in enumerate(pop_cur.execute("SELECT id_individu,age FROM population").fetchall()):
                 if avancement_pop % 5000 == 0:
@@ -191,10 +189,10 @@ class Population:
             "UPDATE population SET activité = 'études' WHERE age >= 3 AND age < 15")
         # On boucle sur chaque groupe d'âge de la répartition des secteurs d'activité
         for (age_min, age_max, sexe, proportion_emploi) in data_cur.execute("SELECT * FROM repartition_emploi").fetchall():
-            # On boucle sur chaque cesteur d'activité pour attribuer l'activité en fonction de sa proportion
+            # On boucle sur chaque secteur d'activité pour attribuer l'activité en fonction de sa proportion
             for (secteur, proportion_sexe, proportion_age) in data_cur.execute("SELECT emploi_sexe.secteur, emploi_sexe.proportion, emploi_age.proportion FROM emploi_age JOIN emploi_sexe ON emploi_sexe.secteur = emploi_age.secteur WHERE sexe = ? AND min <= ? AND max >= ?", (sexe, age_min, age_max)).fetchall():
                 pop_cur.execute("UPDATE population SET activité = ? WHERE id_individu IN (SELECT id_individu FROM population WHERE sexe = ? AND age <= ? AND age >= ? AND activité IS NULL ORDER BY RANDOM() LIMIT ROUND ((SELECT COUNT(id_individu) FROM population WHERE sexe = ? AND age <= ? AND age >= ?) * ?))",
-                                (secteur, sexe, age_max, age_min, sexe, age_max, age_min, proportion_emploi*proportion_age*proportion_sexe))
+                (secteur, sexe, age_max, age_min, sexe, age_max, age_min, proportion_emploi*proportion_age*proportion_sexe))
         pop_db.commit()
 
         print("\033[92mPopulation générée !\033[0m")
@@ -298,12 +296,12 @@ class Individu:
                     mois_vaccin = (jour - self.vaccin_date)/30.5
                     # On récupère l'efficacité de la vaccination en fonction du vaccin et de la durée depuis la vaccination
                     self.cache_immunite[type-1] *= (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?",
-                                                        (self.vaccin_type, self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
+                    (self.vaccin_type, self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
                 # Immunité due à une infection
                 elif self.infection_immunite_date is not None:
                     mois_vaccin = (jour - self.infection_immunite_date)/30.5
                     self.cache_immunite[type-1] *= (1-data_cur.execute("SELECT efficacite from vaccins WHERE vaccin = ? AND age_min <= ? AND age_max >= ? AND mois_min <= ? AND mois_max >= ? AND etat = ?",
-                                                        ("Infection", self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
+                    ("Infection", self.age, self.age, mois_vaccin, mois_vaccin, type)).fetchall()[0][0])
             self.cache_immunite_date = jour
             return self.cache_immunite[type-1]
 
